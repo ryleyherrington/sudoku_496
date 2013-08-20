@@ -3,8 +3,6 @@
 import webapp2
 import cgi
 import sys 
-import json
-import datetime
 
 from google.appengine.api import users
 from google.appengine.ext import webapp
@@ -33,7 +31,7 @@ def solve(a):
       solve(a[:i]+n+a[i+1:])
   
 
-class MainHandler(webapp.RequestHandler):
+class MainPage(webapp.RequestHandler):
   def get(self):
     self.response.out.write("""
     <html>
@@ -45,44 +43,30 @@ class MainHandler(webapp.RequestHandler):
       </body>
     </html>""")
 
- def post(self):
-        req = json.loads(self.request.body)
-        res = {"time":datetime.datetime.now().isoformat()}
-        res['data'] = req
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.out.write(json.dumps(data))
 
-class PostHandler(webapp.RequestHandler):
-    def get(self):
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.body = json.dumps()
-        self.response.set_status(200)
-
-class SolveHandler(webapp.RequestHandler):
+class SolvedPage(webapp.RequestHandler):
   def post(self):
     puzzle = self.request.get('content')
-     
-#    self.response.out.write('<html><body>Unsolved Puzzle:<p></p>')
-#    self.response.out.write(cgi.escape(puzzle))
-#    self.response.out.write('<p></p> Solved Puzzle:<p></p>')
+	#should put puzzle into the datastore here
     solve(puzzle)
     self.response.out.write(puzzleAnswer)
-#    self.response.out.write('<br></br>')
-#    for k in range (0, 81, 9):
-#      self.response.out.write(puzzleAnswer[k+0:k+3] + ' | ' + puzzleAnswer[k+3:k+6] + ' | ' + puzzleAnswer[k+6:k+9]+'<br/>')
-#      if k is 18 or k is 45:
-#        self.response.out.write('---- + ---- + ----'+'<br/>')
-    self.response.out.write('</body></html>')
+
+    #self.response.out.write('<html><body>Unsolved Puzzle:<p></p>')
+    #self.response.out.write(cgi.escape(puzzle))
+    #self.response.out.write('<p></p> Solved Puzzle:<p></p>')
+    #DELETE ABOVE LINE IF YOU UNCOMMENT self.response.out.write(puzzleAnswer)
+    #self.response.out.write('<br></br>')
+    #for k in range (0, 81, 9):
+    #  self.response.out.write(puzzleAnswer[k+0:k+3] + ' | ' + puzzleAnswer[k+3:k+6] + ' | ' + puzzleAnswer[k+6:k+9]+'<br/>')
+    #  if k is 18 or k is 45:
+    #    self.response.out.write('---- + ---- + ----'+'<br/>')
+    #self.response.out.write('</body></html>')
+
 
 application = webapp.WSGIApplication(
-                                     [('/', MainHandler),
-                                      ('/solve', SolveHandler),
-                                      ('/post', PostHandler),
-                                      ('/rest/.*', rest.Dispatcher)],
+                                     [('/', MainPage),
+                                      ('/solve', SolvedPage)],
                                      debug=True)
-rest.Dispatcher.base_url="/rest"
-rest.Dispatcher.add_models({
-	"Puzzle":Puzzle })
 
 def main():
     run_wsgi_app(application)

@@ -58,15 +58,14 @@ class MainPage(webapp.RequestHandler):
 			self.response.out.write('<p>UNSOLVED:<br/> %s</p>'%cgi.escape(sudoku.puzzle))
 
 		self.response.out.write("""
-				<form action="/sign?%s" method="post">
+			<form action="/sign?%s" method="post">
 				<div><textarea name="puzzle" rows="3" cols="60"></textarea></div>
 				<div><input type="submit" value="Solve Puzzle"></div>
-				</form>
-			</body>
-			</html>""" % (urllib.urlencode({'guestbook_name': 'cs496'})))
+			</form>
+		</body>
+		</html>"""%(urllib.urlencode({'guestbook_name': guestbook_name})))
 
 class SolveHandler(webapp.RequestHandler):
-
 	def get(self):
 		sudokus = db.GqlQuery("SELECT * "
 							"FROM Sudoku "
@@ -76,9 +75,10 @@ class SolveHandler(webapp.RequestHandler):
 
 		for sudoku in sudokus:
 			self.response.out.write('<p>%s</p>'%cgi.escape(sudoku.puzzle))
-			if sudoku.solved_puzzle== 'a':
+			if sudoku.solved_puzzle == None:
 				solve(sudoku.puzzle)
 				sudoku.solved_puzzle = puzzleAnswer	
+				sudoku.put()
 	
 			self.response.out.write('<p>%s<p>'%sudoku.solved_puzzle)
 
@@ -91,13 +91,25 @@ class SolveHandler(webapp.RequestHandler):
 
 		sudoku.puzzle = self.request.get('puzzle')
 		sudoku.author = self.request.get('author')
-		sudoku.solved_puzzle = 'a'
 		sudoku.put()
 
 		self.redirect('/?' + urllib.urlencode({'guestbook_name': guestbook_name}))
 
+class Guestbook(webapp.RequestHandler):
+  def post(self):
+    guestbook_name = 'cs496'
+    sudoku = Sudoku(parent=guestbook_key(guestbook_name))
+
+    if users.get_current_user():
+      sudoku.author = users.get_current_user().nickname()
+
+    sudoku.puzzle = self.request.get('puzzle')
+    sudoku.put()
+    self.redirect('/?' + urllib.urlencode({'guestbook_name': guestbook_name}))
+
 application = webapp.WSGIApplication([
 	('/', MainPage),
+	('/sign', Guestbook),
 	('/solve', SolveHandler),
 ], debug=True)
 

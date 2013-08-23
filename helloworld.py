@@ -56,6 +56,7 @@ class MainPage(webapp.RequestHandler):
 
 		for sudoku in sudokus:
 			self.response.out.write('<p>UNSOLVED:<br/> %s</p>'%cgi.escape(sudoku.puzzle))
+			self.response.out.write('<a href="/puzz?'+(urllib.urlencode({"puzz":sudoku.puzzle}))+'">Solve</a>')
 
 		self.response.out.write("""
 			<form action="/sign?%s" method="post">
@@ -86,14 +87,48 @@ class SolveHandler(webapp.RequestHandler):
 		guestbook_name = self.request.get('guestbook_name')
 		sudoku = Sudoku(parent=guestbook_key(guestbook_name))
 
-		if users.get_current_user():
-			sudoku.author = users.get_current_user().nickname()
-
 		sudoku.puzzle = self.request.get('puzzle')
 		sudoku.author = self.request.get('author')
+		sudoku.solved_puzzle = None
 		sudoku.put()
 
 		self.redirect('/?' + urllib.urlencode({'guestbook_name': guestbook_name}))
+
+
+class PuzzleSolver(webapp.RequestHandler):
+	def get(self):
+		puzzle = self.request.get('puzz')
+		sudokus = db.GqlQuery("SELECT * "
+							  "FROM Sudoku "
+							  "WHERE ANCESTOR IS :1 "
+							  "AND puzzle= :2",
+							   guestbook_key('cs496'), puzzle)
+
+		for s in sudokus:
+			self.response.out.write(s.puzzle)
+			if s.solved_puzzle == None:
+				solve(puzzle)
+				s.solved_puzzle=puzzleAnswer
+				s.put()	
+
+			self.response.out.write('<br/>')
+
+		for k in range (0, 81, 9):
+			self.response.out.write(puzzleAnswer[k+0:k+3] +
+				 ' | ' + puzzleAnswer[k+3:k+6] +
+				 ' | ' + puzzleAnswer[k+6:k+9]+'<br/>')
+			if k is 18 or k is 45:
+				self.response.out.write('---- + ---- + ----'+'<br/>')
+
+	def post(self):
+		sudoku = Sudoku(parent=guestbook_key('cs496'))
+		sudoku.puzzle = self.request.get('puzzle')
+		sudoku.author = self.request.get('author')
+		sudoku.solved_puzzle = None
+		sudoku.put()
+
+		self.redirect('/?' + urllib.urlencode({'guestbook_name': guestbook_name}))
+
 
 class Guestbook(webapp.RequestHandler):
   def post(self):
@@ -110,6 +145,7 @@ class Guestbook(webapp.RequestHandler):
 application = webapp.WSGIApplication([
 	('/', MainPage),
 	('/sign', Guestbook),
+	('/puzz', PuzzleSolver),
 	('/solve', SolveHandler),
 ], debug=True)
 

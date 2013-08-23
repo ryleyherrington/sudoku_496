@@ -41,6 +41,16 @@ def sudokubook_key(sudokubook_name=None):
 	"""Constructs a Datastore key for a Guestbook entity with sudokubook_name."""
 	return db.Key.from_path('Guestbook', sudokubook_name or 'default_sudokubook')
 
+def prettyPrint(puzzle):
+    answer = ''
+    for k in range (0, 81, 9):
+        answer = answer + puzzle[k+0:k+3] + ' | ' + puzzle[k+3:k+6] + ' | ' + puzzle[k+6:k+9]+'<br/>'
+        if k is 18 or k is 45:
+            answer =answer + '---- + ---- + ----'+'<br/>'
+
+    answer = answer+'<br/>'
+    return answer
+
 
 class MainPage(webapp.RequestHandler):
 
@@ -50,21 +60,31 @@ class MainPage(webapp.RequestHandler):
 
 		sudokus = db.GqlQuery("SELECT * "
 							"FROM Sudoku "
-							"WHERE ANCESTOR IS :1 "
-							"ORDER BY date DESC LIMIT 10",
-							sudokubook_key('cs496'))
+							"ORDER BY date DESC LIMIT 10")
 
 		for sudoku in sudokus:
-			self.response.out.write('<p>Puzzle List:<br/> %s</p>'%cgi.escape(sudoku.puzzle))
-			self.response.out.write('<a href="/puzz?'+(urllib.urlencode({"puzz":sudoku.puzzle}))+'">Solve</a>')
+			if sudoku.author == None:
+				sudoku.author = "Anonymous"
+			self.response.out.write(sudoku.author+" wanted to solve this puzzle:</br>")
+			self.response.out.write(prettyPrint(sudoku.puzzle))
+			self.response.out.write('<a href="/puzz?'+(urllib.urlencode({"puzz":sudoku.puzzle}))+'">Solve</a><br/>')
 
 		self.response.out.write("""
-			<form action="/sign?%s" method="post">
+			<form action="/?%s" method="post">
 				<div><textarea name="puzzle" rows="3" cols="60"></textarea></div>
 				<div><input type="submit" value="Enter sudoku"></div>
 			</form>
 		</body>
 		</html>"""%(urllib.urlencode({'sudokubook_name': sudokubook_name})))
+
+	def post(self):
+		sudokubook_name = 'cs496'
+		sudoku = Sudoku(parent=sudokubook_key(sudokubook_name))
+		sudoku.puzzle = self.request.get('puzzle')
+		sudoku.put()
+
+		self.redirect('/?' + urllib.urlencode({'sudokubook_name': sudokubook_name}))
+
 
 class SolveHandler(webapp.RequestHandler):
 	def get(self):
@@ -75,16 +95,15 @@ class SolveHandler(webapp.RequestHandler):
 							 sudokubook_key('cs496'))
 
 		for sudoku in sudokus:
-			self.response.out.write('<p>%s</p>'%cgi.escape(sudoku.puzzle))
 			if sudoku.solved_puzzle == None:
 				solve(sudoku.puzzle)
 				sudoku.solved_puzzle = puzzleAnswer	
 				sudoku.put()
 	
-			self.response.out.write('<p>%s<p>'%sudoku.solved_puzzle)
+			self.response.out.write('<p>%s<p>'%prettyPrint(sudoku.solved_puzzle))
 
 	def post(self):
-		sudokubook_name = self.request.get('sudokubook_name')
+		sudokubook_name = 'cs496'
 		sudoku = Sudoku(parent=sudokubook_key(sudokubook_name))
 
 		sudoku.puzzle = self.request.get('puzzle')
@@ -92,10 +111,30 @@ class SolveHandler(webapp.RequestHandler):
 		sudoku.solved_puzzle = None
 		sudoku.put()
 
-		self.redirect('/?' + urllib.urlencode({'sudokubook_name': sudokubook_name}))
+		self.redirect('/view?author=' + urllib.urlencode(sudoku.author))
+
+class ViewHandler(webapp.RequestHandler):
+	def get(self):
+		author = "Anonymous"
+		author = self.request.get('author')
+		sudoku = db.GqlQuery("SELECT * "
+							 "FROM Sudoku "  
+							 "WHERE author =:1 LIMIT 1 ", author)  
+		for s in sudoku:
+			if s.solved_puzzle == None or s.solved_puzzle == 0:
+				solve(s.puzzle)
+				s.solved_puzzle=puzzleAnswer
+				s.put()	
+			puzzle = s.solved_puzzle	
+
+		response = ''
+		for k in range (0, 81, 9):
+			response = response + puzzle[k+0:k+3] + ' | ' + puzzle[k+3:k+6] + ' | ' + puzzle[k+6:k+9]+'\n'
+			if k is 18 or k is 45:
+				response =response + '---- + ---- + ----\n'
+		self.response.out.write(response)
 
 class PuzzleSolver(webapp.RequestHandler):
-
 	def get(self):
 		puzzle = self.request.get('puzz')
 		sudoku = db.GqlQuery("SELECT * "
@@ -105,7 +144,6 @@ class PuzzleSolver(webapp.RequestHandler):
 							   sudokubook_key('cs496'), puzzle)
 
 		for s in sudoku:
-			#self.response.out.write(s.puzzle)
 			if s.solved_puzzle == None:
 				solve(puzzle)
 				s.solved_puzzle=puzzleAnswer
@@ -120,32 +158,10 @@ class PuzzleSolver(webapp.RequestHandler):
 
 		self.response.out.write('<br/>')
 
-	def post(self):
-		sudoku = Sudoku(parent=sudokubook_key('cs496'))
-		sudoku.puzzle = self.request.get('puzzle')
-		sudoku.author = self.request.get('author')
-		sudoku.solved_puzzle = None
-		sudoku.put()
-
-		self.redirect('/?' + urllib.urlencode({'sudokubook_name': sudokubook_name}))
-
-
-class Guestbook(webapp.RequestHandler):
-  def post(self):
-    sudokubook_name = 'cs496'
-    sudoku = Sudoku(parent=sudokubook_key(sudokubook_name))
-
-    if users.get_current_user():
-      sudoku.author = users.get_current_user().nickname()
-
-    sudoku.puzzle = self.request.get('puzzle')
-    sudoku.put()
-    self.redirect('/?' + urllib.urlencode({'sudokubook_name': sudokubook_name}))
-
 application = webapp.WSGIApplication([
 	('/', MainPage),
-	('/sign', Guestbook),
 	('/puzz', PuzzleSolver),
+	('/view', ViewHandler),
 	('/solve', SolveHandler),
 ], debug=True)
 

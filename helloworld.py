@@ -3,8 +3,8 @@ import datetime
 import urllib
 import wsgiref.handlers
 
+from datetime import datetime, timedelta
 from google.appengine.ext import db
-from google.appengine.api import users
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 
@@ -83,7 +83,7 @@ class MainPage(webapp.RequestHandler):
 		sudoku.puzzle = self.request.get('puzzle')
 		sudoku.put()
 
-		self.redirect('/?' + urllib.urlencode({'sudokubook_name': sudokubook_name}))
+		self.redirect('/')
 
 
 class SolveHandler(webapp.RequestHandler):
@@ -158,11 +158,21 @@ class PuzzleSolver(webapp.RequestHandler):
 
 		self.response.out.write('<br/>')
 
+class CronHandler(webapp.RequestHandler):
+	def get(self):
+		sudokus = db.GqlQuery("SELECT * "
+							  "FROM Sudoku")
+
+		for sudoku in sudokus:
+			if sudoku.date < datetime.now() - timedelta(minutes=5):
+				sudoku.delete()
+
 application = webapp.WSGIApplication([
 	('/', MainPage),
 	('/puzz', PuzzleSolver),
 	('/view', ViewHandler),
 	('/solve', SolveHandler),
+	('/cron', CronHandler),
 ], debug=True)
 
 def main():

@@ -1,3 +1,4 @@
+#Copyright 2013 by Ryley Herrington
 import cgi
 import datetime
 import urllib

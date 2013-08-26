@@ -1,3 +1,4 @@
+#Copyright 2013 by Ryley Herrington
 import cgi
 import datetime
 import urllib
@@ -174,11 +175,12 @@ class SolveHandler(webapp.RequestHandler):
 		sudoku = Sudoku(parent=sudokubook_key(sudokubook_name))
 
 		sudoku.puzzle = self.request.get('puzzle')
+		sudoku.author = "Anonymous"
 		sudoku.author = self.request.get('author')
 		sudoku.solved_puzzle = None
 		sudoku.put()
 
-		self.redirect('/view?author=' + urllib.urlencode(sudoku.author))
+		self.redirect('/view?author=' + sudoku.author)
 
 class ViewHandler(webapp.RequestHandler):
 	def get(self):
@@ -188,15 +190,16 @@ class ViewHandler(webapp.RequestHandler):
 							 "FROM Sudoku "  
 							 "WHERE author =:1 LIMIT 1 ", author)  
 		for s in sudoku:
-			if s.solved_puzzle == None or s.solved_puzzle == 0:
-                b = Board()
-                partialSolve(b, sudoku.puzzle)
-                fullAnswer = ''
-                for k in range (0, 81):
-                    fullAnswer = fullAnswer + b.value[k]
-                sudoku.solved_puzzle = fullAnswer
+			if s.solved_puzzle == None:
+				b = Board()
+				partialSolve(b, s.puzzle)
+				fullAnswer = ''
+				for k in range (0, 81):
+					fullAnswer = fullAnswer + b.value[k]
+				s.solved_puzzle = fullAnswer
 				s.put()	
 
+			puzzle = ''
 			puzzle = s.solved_puzzle	
 
 		response = ''
@@ -217,12 +220,12 @@ class PuzzleSolver(webapp.RequestHandler):
 
 		for s in sudoku:
 			if s.solved_puzzle == None:
-                b = Board()
-                partialSolve(b, sudoku.puzzle)
-                fullAnswer = ''
-                for k in range (0, 81):
-                    fullAnswer = fullAnswer + b.value[k]
-                sudoku.solved_puzzle = fullAnswer
+				b = Board()
+				partialSolve(b, sudoku.puzzle)
+				fullAnswer = ''
+				for k in range (0, 81):
+					fullAnswer = fullAnswer + b.value[k]
+				sudoku.solved_puzzle = fullAnswer
 				s.put()	
 
 		for k in range (0, 81, 9):

@@ -51,22 +51,18 @@ def setUniqueInBoard(b):
    change = True
    while change == True:
       change = False
-      #print 'setUniqueInBoard: Checking all 9 rows      : change = ', change
       for k in range(0, 81, 9):
          if setUniqueCells(b, row(k)):
             change = True
-      #print 'setUniqueInBoard: Checking all 9 columns   : change = ', change
       for k in range (9):
          if setUniqueCells(b, col(k)):
             change = True
-      #print 'setUniqueInBoard: Checking all 9 squares   : change = ', change
       for k in range(0, 81,27):
          for j in range(k, k+9, 3):
             if setUniqueCells(b, square(j)):
                change = True
 
 def markCell(b, position, val):
-   #print "markCell(", position, ",", val, ")  value[position] == ", b.value[position], " possible[position] == ", b.possible[position]
    if int(b.value[position]) == 0:
       p = b.possible[position]
       i = p.find(val)
@@ -80,7 +76,6 @@ def markCell(b, position, val):
    
 
 def setCell(b, position, newVal):
-   #print "setCell(", position, ",", newVal, ")  value[position] == ", b.value[position], " possible[position] == ", b.possible[position]
    if int(b.value[position]) == 0:
       b.value[position] = newVal
       if newVal != '0':

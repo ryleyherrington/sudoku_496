@@ -16,29 +16,92 @@ class Sudoku(db.Model):
 	solved_puzzle = db.StringProperty(multiline=True)
 	date = db.DateTimeProperty(auto_now_add=True)
 
-def same_row(i,j): return (i/9 == j/9)
-def same_col(i,j): return (i-j) % 9 == 0
-def same_square(i,j): return (i/27 == j/27 and i%9/3 == j%9/3)
+def row(i):
+	r=(i//9)*9
+	return [ r, r+1, r+2, r+3, r+4, r+5, r+6, r+7, r+8 ]
 
-puzzleAnswer = '0'
+def col(i):
+	c=(i%9)
+	return [c, c+9, c+18, c+27, c+36, c+45, c+54, c+63, c+72 ]
 
-def solve(a):
-	global puzzleAnswer
-	i = a.find('0')
-	if i==-1:
-		puzzleAnswer = a
+def square(i):
+	s=(i//27)*27 + (((i%9)//3)*3)
+	return [s, s+1, s+2, s+9, s+10, s+11, s+18, s+19, s+20 ]
 
-	excluded = set()
-	for j in range(81):
-		if same_row(i,j) or same_col(i,j) or same_square(i,j):
-			excluded.add(a[j])
+class Board:
+	possible = {}
+	value	 = {}
 
-	for n in '123456789':
-		if n not in excluded:
-			solve(a[:i]+n+a[i+1:])
+def setUniqueCells(b, cells):
+	found_change = False
+	all_possibles = ""
+	for c in cells:
+		if int(b.value[c]) == 0:
+			all_possibles = all_possibles + b.possible[c]
+	for v in "123456789":
+		if int(all_possibles.count(v)) == 1:
+			for c in cells:
+				if int(b.possible[c].count(v) == 1) and int(b.value[c]) == 0:
+					setCell(b, c, v)
+					found_change = True
+	return found_change
+
+def setUniqueInBoard(b):
+	change = True
+	while change == True:
+		change = False
+		for k in range(0, 81, 9):
+			if setUniqueCells(b, row(k)):
+				change = True
+		for k in range (9):
+			if setUniqueCells(b, col(k)):
+				change = True
+		for k in range(0, 81,27):
+			for j in range(k, k+9, 3):
+				if setUniqueCells(b, square(j)):
+					change = True
+
+def markCell(b, position, val):
+	if int(b.value[position]) == 0:
+		p = b.possible[position]
+		i = p.find(val)
+		if i == 0:
+			p = p[1:]
+		elif i != -1:
+			p = p[:i] + p[i+1:]
+		b.possible[position] = p
+		if int(b.value[position]) == 0 and int(len(p)) == 1:
+			setCell(b, position, p[0])
+	
+
+def setCell(b, position, newVal):
+	if int(b.value[position]) == 0:
+		b.value[position] = newVal
+		if newVal != '0':
+			b.possible[position] = newVal
+			for x in row(position):
+				if (x != position):
+					markCell(b, x, newVal)
+			for x in col(position):
+				if (x != position):
+					markCell(b, x, newVal)
+			for x in square(position):
+				if (x != position):
+					markCell(b, x, newVal)
+
+def partialSolve(b, line):
+	for i in range(81):
+		b.possible[i] = "123456789"
+		b.value[i] = '0'
+	position=0
+	for val in line:
+		if val is not '0':
+			setCell(b, position, val)
+		position = position + 1
+	setUniqueInBoard(b)
+
 
 def sudokubook_key(sudokubook_name=None):
-	"""Constructs a Datastore key for a Guestbook entity with sudokubook_name."""
 	return db.Key.from_path('Guestbook', sudokubook_name or 'default_sudokubook')
 
 def prettyPrint(puzzle):
@@ -96,8 +159,12 @@ class SolveHandler(webapp.RequestHandler):
 
 		for sudoku in sudokus:
 			if sudoku.solved_puzzle == None:
-				solve(sudoku.puzzle)
-				sudoku.solved_puzzle = puzzleAnswer	
+				b = Board()
+				partialSolve(b, sudoku.puzzle)
+				fullAnswer = ''
+				for k in range (0, 81):
+					fullAnswer = fullAnswer + b.value[k]
+				sudoku.solved_puzzle = fullAnswer
 				sudoku.put()
 	
 			self.response.out.write('<p>%s<p>'%prettyPrint(sudoku.solved_puzzle))
@@ -122,9 +189,14 @@ class ViewHandler(webapp.RequestHandler):
 							 "WHERE author =:1 LIMIT 1 ", author)  
 		for s in sudoku:
 			if s.solved_puzzle == None or s.solved_puzzle == 0:
-				solve(s.puzzle)
-				s.solved_puzzle=puzzleAnswer
+                b = Board()
+                partialSolve(b, sudoku.puzzle)
+                fullAnswer = ''
+                for k in range (0, 81):
+                    fullAnswer = fullAnswer + b.value[k]
+                sudoku.solved_puzzle = fullAnswer
 				s.put()	
+
 			puzzle = s.solved_puzzle	
 
 		response = ''
@@ -145,8 +217,12 @@ class PuzzleSolver(webapp.RequestHandler):
 
 		for s in sudoku:
 			if s.solved_puzzle == None:
-				solve(puzzle)
-				s.solved_puzzle=puzzleAnswer
+                b = Board()
+                partialSolve(b, sudoku.puzzle)
+                fullAnswer = ''
+                for k in range (0, 81):
+                    fullAnswer = fullAnswer + b.value[k]
+                sudoku.solved_puzzle = fullAnswer
 				s.put()	
 
 		for k in range (0, 81, 9):
